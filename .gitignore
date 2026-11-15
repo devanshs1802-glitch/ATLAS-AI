@@ -1,0 +1,25 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environments & Environments
+.env
+.venv
+env/
+venv/
+
+# IDE and Editor configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local Dataset Archives (Keep sample_tiles tracked)
+data/
+*.zip
+
+# Operating System Files
+.DS_Store
+Thumbs.db
