@@ -1,0 +1,17 @@
+# Core Deep Learning & Computer Vision
+torch>=2.1.0
+torchvision>=0.16.0
+
+# Dataset Loading & Processing
+datasets[vision]>=2.18.0
+pillow>=10.0.0
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Evaluation & Metrics
+scikit-learn>=1.3.0
+
+# Streamlit Geospatial Command Center UI
+streamlit>=1.32.0
+streamlit-image-comparison>=0.0.4
+plotly>=5.18.0

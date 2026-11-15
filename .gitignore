@@ -1,0 +1,27 @@
+# Local Dataset Storage (BigEarthNet v2.0 / EuroSAT Arrow & raw files)
+data/
+*.arrow
+*.parquet
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python Bytecode & Caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Environment Variables & Secrets
+.env
+.streamlit/secrets.toml
+
+# IDE & OS Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
