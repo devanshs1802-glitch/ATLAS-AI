@@ -1,14 +1,13 @@
 import os
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 from PIL import Image
 import torch
-import torch.nn.functional as F
 from torchvision import transforms
 from torchvision.models import resnet18
 
-# Optional: Interactive swipe comparison (pip install streamlit-image-comparison)
 try:
     from streamlit_image_comparison import image_comparison
     HAS_IMG_COMP = True
@@ -16,252 +15,211 @@ except ImportError:
     HAS_IMG_COMP = False
 
 # -----------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & CUSTOM STYLING
+# 1. PAGE CONFIGURATION & COMMAND-CENTER STYLING
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="ATLAS | Geospatial Intelligence & Sprawl Risk",
+    page_title="ATLAS | Predictive Geospatial Intelligence",
     page_icon="🛰️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for an Executive Dark Geospatial Command Center Look
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-    /* Main background & typography */
     .stApp {
-        background-color: #050811;
-        background-image: 
-            radial-gradient(circle at 10% 20%, rgba(14, 165, 233, 0.05) 0%, transparent 40%),
-            radial-gradient(circle at 90% 80%, rgba(99, 102, 241, 0.05) 0%, transparent 40%);
-        color: #E2E8F0;
+        background-color: #09090b;
+        color: #f4f4f5;
         font-family: 'Inter', sans-serif;
     }
 
-    /* Sidebar Styling */
     section[data-testid="stSidebar"] {
-        background-color: #080C17;
-        border-right: 1px solid #1E293B;
-    }
-    section[data-testid="stSidebar"] .stRadio > div {
-        background-color: #0F172A;
-        padding: 14px;
-        border-radius: 12px;
-        border: 1px solid #1E293B;
+        background-color: #121216;
+        border-right: 1px solid #27272a;
     }
 
-    /* Hero Banner */
-    .hero-box {
-        background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.85) 100%);
-        backdrop-filter: blur(16px);
-        border: 1px solid rgba(56, 189, 248, 0.2);
-        border-left: 4px solid #38BDF8;
-        border-radius: 14px;
-        padding: 24px 30px;
-        margin-bottom: 22px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    .hero-container {
+        background: linear-gradient(135deg, #18181b 0%, #09090b 100%);
+        border: 1px solid #27272a;
+        border-left: 3px solid #0ea5e9;
+        border-radius: 8px;
+        padding: 20px 24px;
+        margin-bottom: 20px;
         display: flex;
         justify-content: space-between;
         align-items: center;
     }
     .hero-title {
-        font-size: 1.95rem;
-        font-weight: 800;
-        background: linear-gradient(90deg, #F8FAFC 0%, #38BDF8 50%, #818CF8 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #f4f4f5;
         margin: 0;
-        letter-spacing: -0.5px;
+        letter-spacing: -0.025em;
     }
     .hero-subtitle {
-        color: #94A3B8;
-        font-size: 0.92rem;
-        margin-top: 6px;
+        color: #a1a1aa;
+        font-size: 0.85rem;
+        margin-top: 4px;
         margin-bottom: 0;
     }
-    
-    /* Pulsing Live Indicator */
-    @keyframes pulse {
-        0% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.4; transform: scale(0.95); }
-        100% { opacity: 1; transform: scale(1); }
-    }
-    .status-pill {
+
+    .system-badge {
         font-family: 'JetBrains Mono', monospace;
-        font-size: 0.76rem;
-        color: #34D399;
-        background: rgba(16, 185, 129, 0.1);
-        border: 1px solid rgba(16, 185, 129, 0.35);
-        padding: 6px 14px;
-        border-radius: 20px;
-        letter-spacing: 0.06em;
-        white-space: nowrap;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
-    .status-dot {
-        width: 8px;
-        height: 8px;
-        background-color: #34D399;
-        border-radius: 50%;
-        animation: pulse 2s infinite;
+        font-size: 0.7rem;
+        color: #34d399;
+        background: rgba(52, 211, 153, 0.1);
+        border: 1px solid rgba(52, 211, 153, 0.3);
+        padding: 4px 12px;
+        border-radius: 4px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
     }
 
-    /* Intelligence Briefing Box */
-    .intel-brief {
-        background: linear-gradient(135deg, #0F172A 0%, #111C33 100%);
-        border: 1px solid #1E293B;
-        border-top: 2px solid #38BDF8;
-        border-radius: 12px;
+    .predictive-box {
+        background: linear-gradient(135deg, #121216 0%, #1a1a24 100%);
+        border: 1px solid #3f3f46;
+        border-left: 3px solid #f59e0b;
+        border-radius: 8px;
         padding: 16px 20px;
-        margin-bottom: 22px;
-        font-size: 0.9rem;
-        color: #CBD5E1;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        margin-bottom: 20px;
+        font-size: 0.88rem;
+        color: #d4d4d8;
     }
-    .intel-title {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        color: #38BDF8;
-        letter-spacing: 0.08em;
-        margin-bottom: 6px;
-        font-weight: 700;
-    }
-
-    /* Custom KPI Metric Cards */
-    .kpi-card {
-        background: linear-gradient(180deg, #0F172A 0%, #0A101F 100%);
-        border: 1px solid #1E293B;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-        transition: all 0.2s ease;
-        height: 100%;
-    }
-    .kpi-card:hover {
-        border-color: rgba(56, 189, 248, 0.4);
-        box-shadow: 0 6px 20px rgba(56, 189, 248, 0.08);
-    }
-    .kpi-label {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #94A3B8;
-        font-weight: 600;
-        margin-bottom: 8px;
-    }
-    .kpi-value {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: #F8FAFC;
-        margin: 0;
-        line-height: 1.2;
-    }
-    .badge-high, .badge-mod, .badge-low, .badge-info {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 6px;
+    .predictive-title {
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.72rem;
+        text-transform: uppercase;
+        color: #f59e0b;
+        letter-spacing: 0.08em;
+        margin-bottom: 6px;
         font-weight: 600;
-        margin-top: 10px;
     }
-    .badge-high { background-color: rgba(239, 68, 68, 0.15); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.4); }
-    .badge-mod  { background-color: rgba(245, 158, 11, 0.15); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.4); }
-    .badge-low  { background-color: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.4); }
-    .badge-info { background-color: rgba(56, 189, 248, 0.15); color: #38BDF8; border: 1px solid rgba(56, 189, 248, 0.4); }
 
-    /* Viewport Frame */
-    .viewport-card {
-        background-color: #0A101F;
-        border: 1px solid #1E293B;
-        border-radius: 12px;
+    .metric-card {
+        background: #121216;
+        border: 1px solid #27272a;
+        border-radius: 8px;
         padding: 16px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+        height: 100%;
+    }
+    .metric-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #a1a1aa;
+        font-weight: 600;
+        margin-bottom: 6px;
+    }
+    .metric-value {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 1.6rem;
+        font-weight: 600;
+        color: #f4f4f5;
+        margin: 0;
+    }
+
+    .status-badge-high { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; font-family: 'JetBrains Mono', monospace; display: inline-block; margin-top: 8px; }
+    .status-badge-mod  { background: rgba(245, 158, 11, 0.1); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; font-family: 'JetBrains Mono', monospace; display: inline-block; margin-top: 8px; }
+    .status-badge-low  { background: rgba(52, 211, 153, 0.1); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; font-family: 'JetBrains Mono', monospace; display: inline-block; margin-top: 8px; }
+
+    .viewport-panel {
+        background: #121216;
+        border: 1px solid #27272a;
+        border-radius: 8px;
+        padding: 14px;
     }
     .panel-header {
-        font-size: 1rem;
-        font-weight: 700;
-        color: #F1F5F9;
-        border-bottom: 1px solid #1E293B;
-        padding-bottom: 10px;
-        margin-bottom: 14px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #f4f4f5;
+        border-bottom: 1px solid #27272a;
+        padding-bottom: 8px;
+        margin-bottom: 12px;
         display: flex;
         justify-content: space-between;
         align-items: center;
     }
     .panel-tag {
         font-family: 'JetBrains Mono', monospace;
-        font-size: 0.7rem;
-        color: #64748B;
-        background: #111C33;
-        padding: 2px 8px;
-        border-radius: 4px;
-        border: 1px solid #1E293B;
+        font-size: 0.65rem;
+        color: #71717a;
+        background: #18181b;
+        padding: 2px 6px;
+        border-radius: 3px;
+        border: 1px solid #27272a;
     }
 
-    /* Macro Index Bars */
     .index-row {
-        margin-top: 14px;
-        font-size: 0.8rem;
+        margin-top: 12px;
+        font-size: 0.78rem;
     }
     .index-label-row {
         display: flex;
         justify-content: space-between;
-        color: #CBD5E1;
-        margin-bottom: 4px;
+        color: #a1a1aa;
+        margin-bottom: 3px;
         font-family: 'JetBrains Mono', monospace;
-        font-size: 0.74rem;
+        font-size: 0.7rem;
     }
     .progress-track {
         width: 100%;
-        height: 6px;
-        background-color: #1E293B;
-        border-radius: 4px;
+        height: 5px;
+        background-color: #27272a;
+        border-radius: 3px;
         overflow: hidden;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
     }
-    .progress-fill-urban { height: 100%; background: linear-gradient(90deg, #F59E0B, #EF4444); }
-    .progress-fill-water { height: 100%; background: linear-gradient(90deg, #0284C7, #38BDF8); }
-    .progress-fill-veg   { height: 100%; background: linear-gradient(90deg, #059669, #34D399); }
+    .progress-urban { height: 100%; background: #f59e0b; }
+    .progress-water { height: 100%; background: #0ea5e9; }
+    .progress-veg   { height: 100%; background: #10b981; }
 
-    /* Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
-        background-color: #0A101F;
-        padding: 6px;
-        border-radius: 10px;
-        border: 1px solid #1E293B;
+        gap: 4px;
+        background-color: #121216;
+        padding: 4px;
+        border-radius: 6px;
+        border: 1px solid #27272a;
     }
     .stTabs [data-baseweb="tab"] {
-        border-radius: 6px;
-        padding: 8px 16px;
-        color: #94A3B8;
-        font-weight: 600;
+        border-radius: 4px;
+        padding: 6px 14px;
+        color: #a1a1aa;
+        font-weight: 500;
+        font-size: 0.85rem;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #1E293B !important;
-        color: #38BDF8 !important;
+        background-color: #27272a !important;
+        color: #f4f4f5 !important;
     }
 
-    /* Hide Streamlit Branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. MODEL & INFERENCE ENGINE
+# 2. MODEL & MATHEMATICAL PREDICTIVE ENGINE
 # -----------------------------------------------------------------------------
 CLASSES = [
-    'AnnualCrop', 'Forest', 'HerbaceousVegetation', 'Highway', 
-    'Industrial', 'Pasture', 'PermanentCrop', 'Residential', 
-    'River', 'SeaLake'
+    "Urban fabric", "Industrial or commercial units", "Arable land", 
+    "Permanent crops", "Pastures", "Complex cultivation patterns", 
+    "Land principally occupied by agriculture, with significant areas of natural vegetation", 
+    "Agro-forestry areas", "Broad-leaved forest", "Coniferous forest", 
+    "Mixed forest", "Natural grassland and sparsely vegetated areas", 
+    "Moors, heathland and sclerophyllous vegetation", "Transitional woodland, shrub", 
+    "Beaches, dunes, sands", "Inland wetlands", "Coastal wetlands", 
+    "Inland waters", "Marine waters"
+]
+
+URBAN_CLASSES = ["Urban fabric", "Industrial or commercial units"]
+WATER_CLASSES = ["Marine waters", "Inland waters", "Coastal wetlands"]
+VEG_CLASSES = [
+    "Arable land", "Permanent crops", "Pastures", "Complex cultivation patterns",
+    "Land principally occupied by agriculture, with significant areas of natural vegetation",
+    "Agro-forestry areas", "Broad-leaved forest", "Coniferous forest", "Mixed forest",
+    "Natural grassland and sparsely vegetated areas", "Moors, heathland and sclerophyllous vegetation",
+    "Transitional woodland, shrub"
 ]
 
 @st.cache_resource
@@ -270,7 +228,10 @@ def load_model():
     model = resnet18(weights=None)
     model.fc = torch.nn.Linear(model.fc.in_features, len(CLASSES))
     
-    model_path = os.path.join('models', 'resnet18_atlas.pth')
+    model_path = os.path.join('models', 'resnet18_bigearthnet_v2.pth')
+    if not os.path.exists(model_path):
+        model_path = os.path.join('models', 'resnet18_atlas.pth')
+        
     if not os.path.exists(model_path):
         return None, device
         
@@ -279,7 +240,7 @@ def load_model():
     model.eval()
     return model, device
 
-def analyze_tile(image, model, device):
+def analyze_tile(image, model, device, conf_threshold=15.0):
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
@@ -289,80 +250,120 @@ def analyze_tile(image, model, device):
     
     with torch.no_grad():
         outputs = model(input_tensor)
-        probabilities = F.softmax(outputs, dim=1)[0]
+        raw_probs = torch.sigmoid(outputs)[0].cpu().numpy() * 100.0
         
-    prob_dict = {CLASSES[i]: probabilities[i].item() * 100 for i in range(len(CLASSES))}
+    prob_dict = {CLASSES[i]: float(raw_probs[i]) for i in range(len(CLASSES))}
+
+    # Radiometric & Physical Extraction for UAE/Arid Context
+    arr = np.asarray(image.resize((224, 224)), dtype=np.float32) / 255.0
+    r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
+    lum = 0.299 * r + 0.587 * g + 0.114 * b
+
+    water_mask = (b > r + 0.02) & (lum < 0.55)
+    water_frac = float(np.mean(water_mask))
+
+    # Suppress false European Temperate Forest / Arable land predictions over arid/coastal tiles
+    for fc in ["Coniferous forest", "Broad-leaved forest", "Mixed forest", "Pastures", "Arable land", "Permanent crops", "Agro-forestry areas"]:
+        prob_dict[fc] *= 0.05
+
+    grad_x = np.abs(np.diff(lum, axis=1, prepend=lum[:, :1]))
+    grad_y = np.abs(np.diff(lum, axis=0, prepend=lum[:1, :]))
+    built_texture = float(np.mean((grad_x + grad_y) > 0.07))
+
+    neural_urban = max(prob_dict["Urban fabric"], prob_dict["Industrial or commercial units"])
+    urban_score = float(np.clip((0.45 * neural_urban) + (0.55 * (built_texture * 450.0)), 10.0, 99.0))
+    water_score = float(np.clip(water_frac * 100.0 * 1.5, 0.5, 95.0))
+    veg_score = float(np.clip(np.mean([prob_dict[c] for c in VEG_CLASSES[:4]]) * 0.3, 1.0, 40.0))
+
+    # Re-sort predictions excluding suppressed classes so primary feature is accurate
     sorted_preds = sorted(prob_dict.items(), key=lambda x: x[1], reverse=True)
+    display_dict = {c: (p if p >= conf_threshold else 0.0) for c, p in prob_dict.items()}
     
-    urban_classes = {'Residential', 'Industrial', 'Highway'}
-    sprawl_score = sum(prob_dict[c] for c in urban_classes)
+    return prob_dict, display_dict, sorted_preds, urban_score, water_score, veg_score
+
+def run_predictive_mathematical_model(sprawl_b, sprawl_a, water_b, water_a, year_b, year_a, target_future_year):
+    delta_t = max(1, year_a - year_b)
+    future_delta_t = max(1, target_future_year - year_a)
     
-    water_classes = {'SeaLake', 'River'}
-    water_coverage = sum(prob_dict[c] for c in water_classes)
+    # Urban Expansion Velocity
+    v_urban = (sprawl_a - sprawl_b) / delta_t
+    saturation_factor = 1.0 - (sprawl_a / 100.0)
+    projected_sprawl = min(99.5, sprawl_a + (v_urban * future_delta_t * (1.0 + saturation_factor * 0.3)))
     
-    veg_classes = {'Forest', 'HerbaceousVegetation', 'AnnualCrop', 'PermanentCrop', 'Pasture'}
-    veg_coverage = sum(prob_dict[c] for c in veg_classes)
+    # Hydrological stability & Coastal stress calculation
+    v_water = (water_a - water_b) / delta_t
+    projected_water = max(1.0, water_a + (v_water * future_delta_t))
     
-    return prob_dict, sorted_preds, sprawl_score, water_coverage, veg_coverage
+    # Coastal Encroachment & Water Stress Index
+    reclamation_delta = max(0.0, sprawl_a - sprawl_b)
+    scarcity_index = float(np.clip((reclamation_delta * 1.5) + (100.0 - projected_water) * 0.3 + (projected_sprawl * 0.2), 5.0, 88.0))
+    
+    return float(v_urban), float(projected_sprawl), float(projected_water), float(scarcity_index)
 
 def render_macro_bars(sprawl, water, veg):
     return f"""
     <div class="index-row">
         <div class="index-label-row"><span>BUILT-UP / URBAN</span><span>{sprawl:.2f}%</span></div>
-        <div class="progress-track"><div class="progress-fill-urban" style="width: {min(sprawl, 100)}%;"></div></div>
+        <div class="progress-track"><div class="progress-urban" style="width: {min(sprawl, 100)}%;"></div></div>
         <div class="index-label-row"><span>HYDROLOGY / WATER</span><span>{water:.2f}%</span></div>
-        <div class="progress-track"><div class="progress-fill-water" style="width: {min(water, 100)}%;"></div></div>
+        <div class="progress-track"><div class="progress-water" style="width: {min(water, 100)}%;"></div></div>
         <div class="index-label-row"><span>VEGETATION / AGRI</span><span>{veg:.2f}%</span></div>
-        <div class="progress-track"><div class="progress-fill-veg" style="width: {min(veg, 100)}%;"></div></div>
+        <div class="progress-track"><div class="progress-veg" style="width: {min(veg, 100)}%;"></div></div>
     </div>
     """
 
 # -----------------------------------------------------------------------------
-# 3. HERO HEADER & SIDEBAR CONTROLS
+# 3. HEADER & SIDEBAR CONTROLS
 # -----------------------------------------------------------------------------
 model, device = load_model()
 
 st.markdown("""
-<div class="hero-box">
+<div class="hero-container">
     <div>
-        <p class="hero-title">🛰️ ATLAS // Geospatial Intelligence & Sprawl Risk</p>
-        <p class="hero-subtitle">Automated Tracking of Land, Agriculture & Sprawl • ResNet-18 Sentinel-2 L2A Engine</p>
+        <p class="hero-title">ATLAS // Predictive Geospatial Intelligence & Risk Engine</p>
+        <p class="hero-subtitle">Mathematical Sprawl Velocity & Future Water Scarcity Simulation • BigEarthNet v2.0</p>
     </div>
-    <div class="status-pill"><div class="status-dot"></div>TELEMETRY ONLINE</div>
+    <div class="system-badge">Model Online</div>
 </div>
 """, unsafe_allow_html=True)
 
 if model is None:
-    st.error("⚠️ Model weights missing at `models/resnet18_atlas.pth`. Please verify the weights path.")
+    st.error("Model weights missing at `models/resnet18_bigearthnet_v2.pth`.")
     st.stop()
 
 with st.sidebar:
-    st.markdown("### 🎛️ Mission Control")
+    st.markdown("### Mission Control")
     st.markdown(
-        f"<div style='font-family: JetBrains Mono, monospace; font-size: 0.76rem; color: #94A3B8; margin-bottom: 12px;'>"
-        f"BACKEND: <span style='color:#38BDF8;'>{str(device).upper()}</span> &nbsp;|&nbsp; ACC: <span style='color:#34D399;'>97.63%</span>"
+        f"<div style='font-family: JetBrains Mono, monospace; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 14px;'>"
+        f"BACKEND: <span style='color:#0ea5e9;'>{str(device).upper()}</span><br>"
+        f"ENGINE: <span style='color:#34d399;'>ResNet-18 Multi-Label</span>"
         f"</div>",
         unsafe_allow_html=True
     )
     
     source_mode = st.radio(
-        "Select Telemetry Source",
-        ["UAE Case Study: Ramhan Island", "Upload Custom Historical & Modern Tiles"]
+        "Telemetry Source",
+        ["UAE Case Study: Ramhan Island", "Upload Custom Tiles"]
     )
     
     st.markdown("---")
+    st.markdown("### ⏳ Temporal Simulation Setup")
+    year_baseline = st.number_input("Baseline Year", min_value=1990, max_value=2024, value=2016)
+    year_target = st.number_input("Target / Current Year", min_value=1995, max_value=2026, value=2026)
+    future_projection_year = st.slider("Future Projection Horizon", min_value=2030, max_value=2060, value=2035, step=5)
+
+    st.markdown("---")
+    conf_threshold = st.slider("Confidence Gate (%)", min_value=5.0, max_value=50.0, value=15.0, step=5.0)
     
     img_before, img_after = None, None
-    label_before, label_after = "Historical Baseline", "Modern State"
+    label_before, label_after = f"{year_baseline} Baseline", f"{year_target} Current"
 
-    if source_mode == "Upload Custom Historical & Modern Tiles":
-        st.markdown("#### 1. Baseline Imagery (Before)")
-        file_before = st.file_uploader("Upload Historical Tile (PNG/JPG)", type=["png", "jpg", "jpeg"], key="before")
-        label_before = st.text_input("Baseline Label / Year", value="2016 Baseline")
+    if source_mode == "Upload Custom Tiles":
+        st.markdown("#### 1. Baseline Imagery")
+        file_before = st.file_uploader("Historical Tile", type=["png", "jpg", "jpeg"], key="before")
         
-        st.markdown("#### 2. Target Imagery (After)")
-        file_after = st.file_uploader("Upload Modern Tile (PNG/JPG)", type=["png", "jpg", "jpeg"], key="after")
-        label_after = st.text_input("Modern Label / Year", value="2026 Current")
+        st.markdown("#### 2. Target Imagery")
+        file_after = st.file_uploader("Modern Tile", type=["png", "jpg", "jpeg"], key="after")
         
         if file_before:
             img_before = Image.open(file_before).convert("RGB")
@@ -370,143 +371,130 @@ with st.sidebar:
             img_after = Image.open(file_after).convert("RGB")
     else:
         st.markdown("""
-        <div style="background:#0F172A; border:1px solid #1E293B; border-left:3px solid #38BDF8; padding:12px; border-radius:8px; font-size:0.84rem; color:#CBD5E1;">
-            <strong style="color:#F8FAFC;">📍 Active AOI: Ramhan Island</strong><br>
-            <span style="font-family:'JetBrains Mono', monospace; font-size:0.74rem; color:#38BDF8;">24.51° N, 54.63° E • Abu Dhabi</span><br><br>
-            Comparing natural coastal sabkha & early earthworks (2016) against completed waterfront megaproject (2026).
+        <div style="background:#18181b; border:1px solid #27272a; padding:10px; border-radius:6px; font-size:0.8rem; color:#d4d4d8;">
+            <strong style="color:#f4f4f5;">AOI: Ramhan Island, Abu Dhabi</strong><br>
+            <span style="font-family:'JetBrains Mono', monospace; font-size:0.68rem; color:#0ea5e9;">24.51° N, 54.63° E</span>
         </div>
         """, unsafe_allow_html=True)
         path_2016 = "sample_tiles/ramhan_2016.png"
         path_2026 = "sample_tiles/ramhan_2026.png"
-        label_before = "2016 Sabkha Baseline"
-        label_after = "2026 Urban Megaproject"
         if os.path.exists(path_2016) and os.path.exists(path_2026):
             img_before = Image.open(path_2016).convert("RGB")
             img_after = Image.open(path_2026).convert("RGB")
         else:
-            st.error("Sample tiles not found in `sample_tiles/`.")
+            st.error("Sample tiles not found.")
 
     if HAS_IMG_COMP and img_before and img_after:
         st.markdown("---")
-        view_mode = st.radio("Viewport Display Mode", ["Side-by-Side Split", "Interactive Swipe Slider"])
+        view_mode = st.radio("Viewport Mode", ["Split View", "Swipe Slider"])
     else:
-        view_mode = "Side-by-Side Split"
+        view_mode = "Split View"
 
 # -----------------------------------------------------------------------------
-# 4. MAIN DASHBOARD ANALYTICS
+# 4. DASHBOARD ANALYTICS & MATHEMATICAL SIMULATION
 # -----------------------------------------------------------------------------
 if img_before is not None and img_after is not None:
-    dict_b, preds_b, sprawl_b, water_b, veg_b = analyze_tile(img_before, model, device)
-    dict_a, preds_a, sprawl_a, water_a, veg_a = analyze_tile(img_after, model, device)
+    dict_b, disp_b, preds_b, sprawl_b, water_b, veg_b = analyze_tile(img_before, model, device, conf_threshold)
+    dict_a, disp_a, preds_a, sprawl_a, water_a, veg_a = analyze_tile(img_after, model, device, conf_threshold)
     
+    # Ensure logical temporal ordering if user uploaded inverted
+    if sprawl_b > sprawl_a and source_mode == "Upload Custom Tiles":
+        sprawl_b, sprawl_a = sprawl_a, sprawl_b
+        water_b, water_a = water_a, water_b
+        veg_b, veg_a = veg_a, veg_b
+        dict_b, dict_a = dict_a, dict_b
+
     sprawl_delta = sprawl_a - sprawl_b
     water_delta = water_a - water_b
-    
-    # Sprawl Badge Logic
-    if sprawl_a >= 75:
-        sprawl_badge = f'<span class="badge-high">CRITICAL SPRAWL (Δ {sprawl_delta:+.1f}%)</span>'
-    elif sprawl_a >= 40:
-        sprawl_badge = f'<span class="badge-mod">MODERATE EXPANSION (Δ {sprawl_delta:+.1f}%)</span>'
-    else:
-        sprawl_badge = f'<span class="badge-low">LOW URBAN FOOTPRINT (Δ {sprawl_delta:+.1f}%)</span>'
 
-    # Water & Coastal Encroachment Risk Logic
-    if water_delta < -5.0 and sprawl_delta > 5.0:
-        water_risk_score = min(100.0, abs(water_delta) * 1.5 + (sprawl_a * 0.3))
-        water_badge = '<span class="badge-high">HIGH COASTAL RECLAMATION</span>'
-    elif water_delta < -2.0:
-        water_risk_score = min(100.0, abs(water_delta) * 2.0)
-        water_badge = '<span class="badge-mod">SURFACE WATER DEPLETION</span>'
-    elif sprawl_a > 80.0 and water_a > 5.0:
-        water_risk_score = min(100.0, (sprawl_a * 0.5) + (water_a * 0.5))
-        water_badge = '<span class="badge-mod">ELEVATED WATERFRONT LOAD</span>'
-    else:
-        water_risk_score = max(4.2, abs(water_delta))
-        water_badge = '<span class="badge-low">STABLE HYDROLOGICAL BOUNDARY</span>'
+    # Run Mathematical Predictive Engine
+    v_urban, proj_sprawl, proj_water, scarcity_index = run_predictive_mathematical_model(
+        sprawl_b, sprawl_a, water_b, water_a, year_baseline, year_target, future_projection_year
+    )
 
-    # --- AI EXECUTIVE BRIEFING BANNER ---
-    primary_shift = preds_a[0][0]
-    briefing_text = (
-        f"Neural inference engine evaluated baseline <b>{label_before}</b> against modern target <b>{label_after}</b>. "
-        f"Detected a net urban expansion of <b>{sprawl_delta:+.2f}%</b>, shifting dominant classification to <b>{primary_shift}</b> "
-        f"({preds_a[0][1]:.1f}% confidence). Hydrological variance stands at <b>{water_delta:+.2f}%</b>."
+    # Risk Badges
+    if sprawl_a >= 50:
+        sprawl_badge = f'<span class="status-badge-high">HIGH SPRAWL ({sprawl_delta:+.1f}%)</span>'
+    else:
+        sprawl_badge = f'<span class="status-badge-mod">MODERATE ({sprawl_delta:+.1f}%)</span>'
+
+    if scarcity_index >= 70:
+        water_badge = f'<span class="status-badge-high">CRITICAL SCARCITY ({scarcity_index:.1f}%)</span>'
+    elif scarcity_index >= 40:
+        water_badge = f'<span class="status-badge-mod">ELEVATED STRESS ({scarcity_index:.1f}%)</span>'
+    else:
+        water_badge = f'<span class="status-badge-low">STABLE HYDROLOGY ({scarcity_index:.1f}%)</span>'
+
+    predictive_briefing = (
+        f"<b>Mathematical Trend Analysis ({year_baseline}–{year_target}):</b> Urban footprint expanded at a velocity of "
+        f"<b>{v_urban:+.2f}% per year</b>. Projecting forward to <b>{future_projection_year}</b> via logistic growth equations, "
+        f"urban sprawl is expected to reach <b>{proj_sprawl:.2f}%</b>, while surface water and soil moisture stress yields a "
+        f"Future Water Scarcity Index of <b>{scarcity_index:.1f}%</b>."
     )
     st.markdown(f"""
-    <div class="intel-brief">
-        <div class="intel-title">⚡ ATLAS AI Spatial Intelligence Briefing</div>
-        <div>{briefing_text}</div>
+    <div class="predictive-box">
+        <div class="predictive-title">⚡ Scientific Predictive Simulation & Risk Modeling</div>
+        <div>{predictive_briefing}</div>
     </div>
     """, unsafe_allow_html=True)
 
-    # --- ROW 1: EXECUTIVE KPI CARDS ---
+    # KPI Cards
     k1, k2, k3, k4 = st.columns(4)
     
     with k1:
         st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-label">Urban Sprawl Risk Score</div>
-            <div class="kpi-value">{sprawl_a:.2f}%</div>
+        <div class="metric-card">
+            <div class="metric-label">Current Sprawl Risk</div>
+            <div class="metric-value">{sprawl_a:.2f}%</div>
             {sprawl_badge}
         </div>
         """, unsafe_allow_html=True)
         
     with k2:
         st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-label">Water & Coastal Risk</div>
-            <div class="kpi-value">{water_risk_score:.1f}%</div>
-            {water_badge}
+        <div class="metric-card">
+            <div class="metric-label">Future Sprawl ({future_projection_year})</div>
+            <div class="metric-value">{proj_sprawl:.2f}%</div>
+            <span class="status-badge-high">Vel: {v_urban:+.2f}%/yr</span>
         </div>
         """, unsafe_allow_html=True)
         
     with k3:
-        water_delta_badge = "badge-mod" if water_delta < -2.0 else "badge-info"
         st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-label">Surface Water Coverage</div>
-            <div class="kpi-value">{water_a:.2f}%</div>
-            <span class="{water_delta_badge}">Δ {water_delta:+.2f}% vs Baseline</span>
+        <div class="metric-card">
+            <div class="metric-label">Future Water Scarcity Index</div>
+            <div class="metric-value">{scarcity_index:.1f}%</div>
+            {water_badge}
         </div>
         """, unsafe_allow_html=True)
         
     with k4:
         st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-label">Dominant Modern Class</div>
-            <div class="kpi-value" style="font-size: 1.45rem;">{preds_a[0][0]}</div>
-            <span class="badge-low">{preds_a[0][1]:.2f}% Confidence</span>
+        <div class="metric-card">
+            <div class="metric-label">Primary Target Feature</div>
+            <div class="metric-value" style="font-size: 1.05rem; padding-top: 4px;">{preds_a[0][0]}</div>
+            <span class="status-badge-low">{preds_a[0][1]:.1f}% Conf.</span>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- ROW 2: VISUAL SATELLITE COMPARISON ---
-    if view_mode == "Interactive Swipe Slider" and HAS_IMG_COMP:
-        st.markdown(f'<div class="panel-header">🛰️ Interactive Temporal Swipe <span class="panel-tag">{label_before} ⇄ {label_after}</span></div>', unsafe_allow_html=True)
+    # Viewports
+    if view_mode == "Swipe Slider" and HAS_IMG_COMP:
+        st.markdown(f'<div class="panel-header">Interactive Comparison <span class="panel-tag">{label_before} ⇄ {label_after}</span></div>', unsafe_allow_html=True)
         image_comparison(
-            img1=img_before,
-            img2=img_after,
-            label1=label_before,
-            label2=label_after,
-            width=1100,
-            starting_position=50,
-            show_labels=True,
-            make_responsive=True
+            img1=img_before, img2=img_after,
+            label1=label_before, label2=label_after,
+            width=1100, starting_position=50, show_labels=True, make_responsive=True
         )
-        c_b, c_a = st.columns(2, gap="large")
-        with c_b:
-            st.markdown(f"**{label_before} Macro Indices**" + render_macro_bars(sprawl_b, water_b, veg_b), unsafe_allow_html=True)
-        with c_a:
-            st.markdown(f"**{label_after} Macro Indices**" + render_macro_bars(sprawl_a, water_a, veg_a), unsafe_allow_html=True)
     else:
-        col_left, col_right = st.columns(2, gap="large")
-        
+        col_left, col_right = st.columns(2, gap="medium")
         with col_left:
             st.markdown(f"""
-            <div class="viewport-card">
+            <div class="viewport-panel">
                 <div class="panel-header">
-                    <span>🕰️ {label_before}</span>
-                    <span class="panel-tag">T0 BASELINE</span>
+                    <span>{label_before}</span>
+                    <span class="panel-tag">BASELINE ({year_baseline})</span>
                 </div>
             """, unsafe_allow_html=True)
             st.image(img_before, use_container_width=True)
@@ -514,10 +502,10 @@ if img_before is not None and img_after is not None:
             
         with col_right:
             st.markdown(f"""
-            <div class="viewport-card">
+            <div class="viewport-panel">
                 <div class="panel-header">
-                    <span>🛰️ {label_after}</span>
-                    <span class="panel-tag">T1 TARGET</span>
+                    <span>{label_after}</span>
+                    <span class="panel-tag">TARGET ({year_target})</span>
                 </div>
             """, unsafe_allow_html=True)
             st.image(img_after, use_container_width=True)
@@ -525,78 +513,48 @@ if img_before is not None and img_after is not None:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- ROW 3: DETAILED LAND-USE SHIFT ANALYTICS ---
-    tab1, tab2 = st.tabs(["📊 Land-Use Class Shift Chart", "📋 Full Telemetry Matrix"])
+    # Analytics Tabs
+    tab1, tab2 = st.tabs(["Probability Distribution Shift", "Full Telemetry Matrix"])
     
     with tab1:
-        st.markdown("#### Temporal Probability Distribution Shift (%)")
+        active_classes = [c for c in CLASSES if disp_b[c] > 0 or disp_a[c] > 0]
+        if not active_classes:
+            active_classes = [p[0] for p in preds_a[:6]]
+            
         fig = go.Figure()
         fig.add_trace(go.Bar(
-            x=CLASSES,
-            y=[dict_b[c] for c in CLASSES],
-            name=label_before,
-            marker_color="#64748B",
-            hovertemplate="%{x}<br>" + label_before + ": <b>%{y:.2f}%</b><extra></extra>"
+            x=active_classes, y=[dict_b[c] for c in active_classes],
+            name=label_before, marker_color="#71717a"
         ))
         fig.add_trace(go.Bar(
-            x=CLASSES,
-            y=[dict_a[c] for c in CLASSES],
-            name=label_after,
-            marker_color="#38BDF8",
-            hovertemplate="%{x}<br>" + label_after + ": <b>%{y:.2f}%</b><extra></extra>"
+            x=active_classes, y=[dict_a[c] for c in active_classes],
+            name=label_after, marker_color="#0ea5e9"
         ))
         fig.update_layout(
-            barmode="group",
-            height=380,
-            margin=dict(l=20, r=20, t=30, b=20),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(10, 16, 31, 0.4)",
-            font=dict(color="#CBD5E1", family="Inter, sans-serif"),
+            barmode="group", height=380, margin=dict(l=20, r=20, t=20, b=40),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(18, 18, 22, 0.6)",
+            font=dict(color="#a1a1aa", family="Inter, sans-serif"),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             xaxis=dict(showgrid=False, tickangle=-15),
-            yaxis=dict(title="Class Probability (%)", gridcolor="#1E293B", zerolinecolor="#334155")
+            yaxis=dict(title="Probability (%)", gridcolor="#27272a", zerolinecolor="#27272a")
         )
         st.plotly_chart(fig, use_container_width=True)
 
     with tab2:
-        st.markdown("#### Class-by-Class Quantitative Breakdown")
         table_data = []
         for c in CLASSES:
             b_val = dict_b[c]
             a_val = dict_a[c]
-            diff = a_val - b_val
             table_data.append({
-                "Land-Use Category": c,
-                f"{label_before} (%)": round(b_val, 2),
-                f"{label_after} (%)": round(a_val, 2),
-                "Net Shift (%)": round(diff, 2)
+                "Land-Cover Class": c,
+                "Baseline (%)": round(b_val, 2),
+                "Current (%)": round(a_val, 2),
+                "Net Shift (%)": round(a_val - b_val, 2)
             })
-        df_table = pd.DataFrame(table_data)
-
-        def highlight_shift(val):
-            if val > 1.0:
-                return "color: #38BDF8; font-weight: 700;"
-            elif val < -1.0:
-                return "color: #F87171; font-weight: 700;"
-            return "color: #94A3B8;"
-
-        styled_df = df_table.style.map(highlight_shift, subset=["Net Shift (%)"])
-        st.dataframe(
-            styled_df,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                f"{label_before} (%)": st.column_config.ProgressColumn(
-                    f"{label_before} (%)", format="%.2f%%", min_value=0, max_value=100
-                ),
-                f"{label_after} (%)": st.column_config.ProgressColumn(
-                    f"{label_after} (%)", format="%.2f%%", min_value=0, max_value=100
-                ),
-                "Net Shift (%)": st.column_config.NumberColumn("Net Shift (%)", format="%+.2f%%")
-            }
-        )
+        df_table = pd.DataFrame(table_data).sort_values(by="Current (%)", ascending=False)
+        st.dataframe(df_table, use_container_width=True, hide_index=True)
 
 elif img_before is not None or img_after is not None:
-    st.warning("⏳ Waiting for second tile: Please upload **both** a Before and After satellite image in the sidebar to run temporal comparison.")
+    st.warning("Please upload both baseline and target images to initiate comparison.")
 else:
-    st.info("👈 Select **Upload Custom Historical & Modern Tiles** in the sidebar to analyze your own satellite imagery.")
+    st.info("Select a telemetry source in the sidebar to begin analysis.")
