@@ -1,5 +1,3 @@
-Here is the updated, production-ready `README.md` formatted to match your requested structure, incorporating your team roles and the complete **ATLAS** project specifications:
-
 ```markdown
 # ATLAS: Automated Tracking of Land, Agriculture & Sprawl
 
