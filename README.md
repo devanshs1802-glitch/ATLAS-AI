@@ -1,4 +1,4 @@
-### **1. `README.md**`
+### 1. README.md
 
 ```markdown
 # ATLAS: Automated Tracking of Land, Agriculture & Sprawl
