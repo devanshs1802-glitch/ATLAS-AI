@@ -1,5 +1,5 @@
 
-# ATLAS: Automated Tracking of Land, Agriculture & Sprawl: **[link](https://atlasai-109.streamlit.app/)
+## ATLAS: Automated Tracking of Land, Agriculture & Sprawl: ** [link](https://atlasai-109.streamlit.app/)
 ```markdown
 A production-grade geospatial AI monitoring pipeline built using PyTorch, Torchvision (**ResNet-18**), and accelerated locally via NVIDIA CUDA (with automated CPU fallback). Designed for high-accuracy land-use multi-label classification, temporal change detection, and predictive urban sprawl/water scarcity risk modeling on satellite imagery.
 
